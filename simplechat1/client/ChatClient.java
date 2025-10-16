@@ -26,6 +26,7 @@ public class ChatClient extends AbstractClient
    * the display method in the client.
    */
   ChatIF clientUI; 
+  private boolean manualDisconnect = false;
 
   
   //Constructors ****************************************************
@@ -50,6 +51,38 @@ public class ChatClient extends AbstractClient
   //Instance methods ************************************************
     
   /**
+   * Called automatically when the connection to the server is closed.
+   * Displays a shutdown message and exits the program.
+   */
+  @Override
+  protected void connectionClosed() {
+      boolean oldStatus = manualDisconnect;
+      manualDisconnect = false;
+
+      if (!oldStatus) { // the pdf you provided (dr. wei) requires this because you say logoff should disconnect and not quit, but this handler is overwritten and you told us to quit on this handler.
+        clientUI.display("Connection closed. Exiting client.");
+        System.exit(0); // connection is already closed
+      }
+  }
+
+  /**
+   * Called automatically when a connection exception occurs.
+   * Displays the exception message and exits the program.
+   *
+   * @param exception The exception thrown by the connection.
+   */
+  @Override
+  protected void connectionException(Exception exception) {
+      boolean oldStatus = manualDisconnect;
+      manualDisconnect = false;
+
+      if (!oldStatus) {
+        clientUI.display("Connection error: " + exception.getMessage() + "; Exiting client.");
+        System.exit(0); // connection is already closed
+      }
+  }
+
+  /**
    * This method handles all data that comes in from the server.
    *
    * @param msg The message from the server.
@@ -60,17 +93,95 @@ public class ChatClient extends AbstractClient
   }
 
   /**
+   * Parses and executes client-side commands starting with '#'
+   * 
+   * @param cmdLine the data passed in the UI.
+   */
+  private void handleCommand(String cmdLine) {
+      String[] parts = cmdLine.split("\\s+", 2);
+
+      String cmd = parts[0].toLowerCase();
+      switch (cmd) {
+          case "#quit":
+              quit();
+          break;
+          case "#logoff":
+              if (isConnected()) {
+                  try {
+                      manualDisconnect = true;
+                      closeConnection();
+                  } catch (IOException e) {
+                      clientUI.display("Error closing connection: " + e.getMessage());
+                  }
+                  clientUI.display("Logged off.");
+          } else clientUI.display("Already logged off.");
+        break;
+        case "#sethost":
+            if (isConnected()) {
+              clientUI.display("Error: must log off first.");
+            } else if (parts.length < 2 || parts[1].isBlank()) {
+              clientUI.display("Usage: #sethost <host>");
+            } else {
+              setHost(parts[1].trim());
+              clientUI.display("Host set to: " + getHost());
+            }
+        break;
+        case "#setport":
+              if (isConnected()) {
+                clientUI.display("Error: must log off first.");
+              } else if (parts.length < 2) {
+                clientUI.display("Usage: #setport <port>");
+              } else {
+                try {
+                  int p = Integer.parseInt(parts[1].trim());
+                  setPort(p);
+                  clientUI.display("Port set to: " + getPort());
+                } catch (NumberFormatException nfe) {
+                   clientUI.display("Port must be a number.");
+                }
+              }
+          break;
+        case "#login":
+          if (!isConnected()) {
+            try {
+              openConnection();
+              clientUI.display("Logged in to " + getHost() + ":" + getPort());
+            } catch (IOException e) {
+              clientUI.display("Error opening connection: " + e.getMessage());
+            }
+          } else {
+            clientUI.display("Already connected.");
+          }
+          break;
+          case "#gethost":
+              clientUI.display("Host: " + getHost());
+              break;
+          case "#getport":
+              clientUI.display("Port: " + getPort());
+              break;
+          default:
+              clientUI.display("Unknown command.");
+      }
+  }
+
+  /**
    * This method handles all data coming from the UI            
    *
-   * @param message The message from the UI.    
+   * @param message The message, or command, from the UI.    
    */
   public void handleMessageFromClientUI(String message)
   {
     try
     {
+      // Handle command.
+      if (message.startsWith("#")) {
+          handleCommand(message);
+          return;
+      }
+
       sendToServer(message);
     }
-    catch(IOException e)
+    catch(Exception e)
     {
       clientUI.display
         ("Could not send message to server.  Terminating client.");

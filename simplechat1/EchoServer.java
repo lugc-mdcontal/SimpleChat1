@@ -4,6 +4,7 @@
 
 import java.io.*;
 import ocsf.server.*;
+import common.ChatIF;
 
 /**
  * This class overrides some of the methods in the abstract 
@@ -23,17 +24,21 @@ public class EchoServer extends AbstractServer
    * The default port to listen on.
    */
   final public static int DEFAULT_PORT = 5555;
+
+  // Server UI
+  private ChatIF serverUI;
   
   //Constructors ****************************************************
   
   /**
-   * Constructs an instance of the echo server.
+   * Constructs an instance of EchoServer with an UI.
    *
-   * @param port The port number to connect on.
+   * @param port the port number to listen on
+   * @param serverUI the user interface (for server messages)
    */
-  public EchoServer(int port) 
-  {
-    super(port);
+  public EchoServer(int port, ChatIF serverUI) {
+      super(port);
+      this.serverUI = serverUI;
   }
 
   
@@ -48,8 +53,28 @@ public class EchoServer extends AbstractServer
   public void handleMessageFromClient
     (Object msg, ConnectionToClient client)
   {
-    System.out.println("Message received: " + msg + " from " + client);
+    serverUI.display("Message received: " + msg + " from " + client);
     this.sendToAllClients(msg);
+  }
+
+  /**
+   * This method is invoked when a new client connects.
+   *
+   * @param client The connection from which the message originated.
+   */
+  @Override
+  protected void clientConnected(ConnectionToClient client) {
+      serverUI.display("Client connected: " + client);
+  }
+
+  /**
+   * This method is invoked when a client disconnects.
+   *
+   * @param client The connection from which the message originated.
+   */
+  @Override
+  protected void clientDisconnected(ConnectionToClient client) {
+      serverUI.display("Client disconnected: " + client);
   }
     
   /**
@@ -58,8 +83,7 @@ public class EchoServer extends AbstractServer
    */
   protected void serverStarted()
   {
-    System.out.println
-      ("Server listening for connections on port " + getPort());
+    serverUI.display("Server listening for connections on port " + getPort());
   }
   
   /**
@@ -68,8 +92,7 @@ public class EchoServer extends AbstractServer
    */
   protected void serverStopped()
   {
-    System.out.println
-      ("Server has stopped listening for connections.");
+    serverUI.display("Server has stopped listening for connections.");
   }
   
   //Class methods ***************************************************
@@ -81,29 +104,25 @@ public class EchoServer extends AbstractServer
    * @param args[0] The port number to listen on.  Defaults to 5555 
    *          if no argument is entered.
    */
-  public static void main(String[] args) 
-  {
-    int port = 0; //Port to listen on
+    public static void main(String[] args) {
+        int port; // Port to listen on
 
-    try
-    {
-      port = Integer.parseInt(args[0]); //Get port from command line
+        try {
+            port = Integer.parseInt(args[0]);
+        } catch (Throwable t) {
+            port = DEFAULT_PORT; // Default 5555
+        }
+
+        ServerConsole console = new ServerConsole(port);
+
+        try {
+            console.server.listen(); // start listening
+        } catch (Exception ex) {
+            console.display("ERROR - Could not listen for clients!");
+        }
+
+        // Start reading from console input
+        console.accept();
     }
-    catch(Throwable t)
-    {
-      port = DEFAULT_PORT; //Set port to 5555
-    }
-	
-    EchoServer sv = new EchoServer(port);
-    
-    try 
-    {
-      sv.listen(); //Start listening for connections
-    } 
-    catch (Exception ex) 
-    {
-      System.out.println("ERROR - Could not listen for clients!");
-    }
-  }
 }
 //End of EchoServer class
