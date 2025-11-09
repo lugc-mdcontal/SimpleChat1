@@ -50,11 +50,55 @@ public class EchoServer extends AbstractServer
    * @param msg The message received from the client.
    * @param client The connection from which the message originated.
    */
-  public void handleMessageFromClient
-    (Object msg, ConnectionToClient client)
-  {
-    serverUI.display("Message received: " + msg + " from " + client);
-    this.sendToAllClients(msg);
+  @Override
+  public void handleMessageFromClient(Object msg, ConnectionToClient client) {
+      String message = msg.toString().trim();
+      String loginId = (String) client.getInfo("loginId");
+
+      // 1. Check if this is a #login command
+      if (message.startsWith("#login")) {
+          if (loginId != null) { // if null, we can say already logged on the in
+              try {
+                  client.sendToClient("Error: Already logged in as " + loginId);
+              } catch (IOException e) { /* what to do here? */ }
+              return;
+          }
+
+          // 1.1 read login id
+          String[] parts = message.split("\\s+", 2);
+          if (parts.length < 2 || parts[1].trim().isEmpty()) {
+              try {
+                  client.sendToClient("Error: CMD Usage is #login <loginId>");
+              } catch (IOException e) { /* what do to here? */ }
+              return;
+          }
+
+          // 1.2 Save loginId
+          loginId = parts[1].trim();
+          client.setInfo("loginId", loginId);
+
+          serverUI.display("Client logged in with ID: " + loginId);
+          try {
+              client.sendToClient("Login working! Welcome " + loginId + "!");
+          } catch (IOException e) { /* what to do here? */ }
+
+          return;
+      }
+
+      // 2. For any other message, check if the client has logged in
+      if (loginId == null) {
+          try {
+              client.sendToClient("Error: Must login with first command which is #login <loginId>!!!");
+              client.close();
+          } catch (IOException e) {
+              serverUI.display("Error closing client connection: " + e.getMessage());
+          }
+          return;
+      }
+
+      // 3. Prefix message with login id and broadcast
+      serverUI.display("Message received from " + loginId + ": " + message);
+      this.sendToAllClients(loginId + "> " + message);
   }
 
   /**

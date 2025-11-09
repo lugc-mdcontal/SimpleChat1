@@ -38,14 +38,15 @@ public class ClientConsole implements ChatIF
   /**
    * Constructs an instance of the ClientConsole UI.
    *
+   * @param loginId The user login name.
    * @param host The host to connect to.
    * @param port The port to connect on.
    */
-  public ClientConsole(String host, int port) 
+  public ClientConsole(String loginId, String host, int port) 
   {
     try 
     {
-      client= new ChatClient(host, port, this);
+      client= new ChatClient(loginId, host, port, this);
     } 
     catch(IOException exception) 
     {
@@ -100,31 +101,40 @@ public class ClientConsole implements ChatIF
   /**
    * This method is responsible for the creation of the Client UI.
    *
-   * @param args[0] The host to connect to.
-   * @param args[1] The port to connect to.
+   * @param args[0] The user's login name.
+   * @param args[1] The host to connect to.
+   * @param args[2] The port to connect to.
    */
-  public static void main(String[] args) 
+  public static void main(String[] args)
   {
-    String host = "";
-    int port = 0;  //The port number
+      String loginId;
+      String host = "localhost";
+      int port = DEFAULT_PORT;
 
-    try
-    {
-      host = args[0];
-    }
-    catch(ArrayIndexOutOfBoundsException e)
-    {
-      host = "localhost";
-    }
+      if (args.length < 1) {
+          System.out.println("Error: Did not input login id!");
+          System.exit(1);
+      }
 
-    try {
-        port = Integer.parseInt(args[1]);
-    } catch (ArrayIndexOutOfBoundsException e) {
-        port = DEFAULT_PORT;
-    }
+      loginId = args[0];
 
-    ClientConsole chat= new ClientConsole(host, port);
-    chat.accept();  //Wait for console data
+      if (args.length > 1) {
+          host = args[1];
+      }
+
+      if (args.length > 2) {
+          try {
+              port = Integer.parseInt(args[2]);
+          } catch (NumberFormatException e) {
+              System.out.println("Invalid port number!!!!! Using default " + DEFAULT_PORT);
+          }
+      }
+
+      System.out.println("About to connect");
+
+      ClientConsole chat = new ClientConsole(loginId, host, port);
+      chat.accept();
   }
 }
+
 //End of ConsoleChat class

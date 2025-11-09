@@ -27,6 +27,7 @@ public class ChatClient extends AbstractClient
    */
   ChatIF clientUI; 
   private boolean manualDisconnect = false;
+  private String loginId;
 
   
   //Constructors ****************************************************
@@ -39,11 +40,12 @@ public class ChatClient extends AbstractClient
    * @param clientUI The interface type variable.
    */
   
-  public ChatClient(String host, int port, ChatIF clientUI) 
+  public ChatClient(String loginId, String host, int port, ChatIF clientUI) 
     throws IOException 
   {
     super(host, port); //Call the superclass constructor
     this.clientUI = clientUI;
+    this.loginId = loginId;
     openConnection();
   }
 
@@ -81,6 +83,17 @@ public class ChatClient extends AbstractClient
         System.exit(0); // connection is already closed
       }
   }
+
+  @Override
+  protected void connectionEstablished() {
+      try {
+          sendToServer("#login " + loginId);
+          clientUI.display("Sent login command on the directly server: #login " + loginId);
+      } catch (IOException e) {
+          clientUI.display("Error sending login command?: " + e.getMessage());
+      }
+  }
+
 
   /**
    * This method handles all data that comes in from the server.
