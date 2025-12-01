@@ -4,10 +4,9 @@
 
 import java.io.*;
 import ocsf.server.*;
-import common.ChatIF;
 
 /**
- * This class overrides some of the methods in the abstract 
+ * This class overrides some of the methods in the abstract
  * superclass in order to give more functionality to the server.
  *
  * @author Dr Timothy C. Lethbridge
@@ -16,29 +15,24 @@ import common.ChatIF;
  * @author Paul Holden
  * @version July 2000
  */
-public class EchoServer extends AbstractServer 
+public class EchoServer extends ObservableOriginatorServer 
 {
   //Class variables *************************************************
-  
+
   /**
    * The default port to listen on.
    */
   final public static int DEFAULT_PORT = 5555;
-
-  // Server UI
-  private ChatIF serverUI;
   
   //Constructors ****************************************************
-  
+
   /**
-   * Constructs an instance of EchoServer with an UI.
+   * Constructs an instance of EchoServer.
    *
    * @param port the port number to listen on
-   * @param serverUI the user interface (for server messages)
    */
-  public EchoServer(int port, ChatIF serverUI) {
+  public EchoServer(int port) {
       super(port);
-      this.serverUI = serverUI;
   }
 
   
@@ -46,21 +40,22 @@ public class EchoServer extends AbstractServer
   
   /**
    * This method handles any messages received from the client.
+   * Notifies observers about client messages and events.
    *
    * @param msg The message received from the client.
    * @param client The connection from which the message originated.
    */
   @Override
-  public void handleMessageFromClient(Object msg, ConnectionToClient client) {
+  protected void handleMessageFromClient(Object msg, ConnectionToClient client) {
       String message = msg.toString().trim();
       String loginId = (String) client.getInfo("loginId");
 
       // 1. Check if this is a #login command
       if (message.startsWith("#login")) {
-          if (loginId != null) { // if null, we can say already logged on the in
+          if (loginId != null) { // Already logged in
               try {
                   client.sendToClient("Error: Already logged in as " + loginId);
-              } catch (IOException e) { /* what to do here? */ }
+              } catch (IOException e) { /* Ignore */ }
               return;
           }
 
@@ -69,7 +64,7 @@ public class EchoServer extends AbstractServer
           if (parts.length < 2 || parts[1].trim().isEmpty()) {
               try {
                   client.sendToClient("Error: CMD Usage is #login <loginId>");
-              } catch (IOException e) { /* what do to here? */ }
+              } catch (IOException e) { /* Ignore */ }
               return;
           }
 
@@ -77,10 +72,12 @@ public class EchoServer extends AbstractServer
           loginId = parts[1].trim();
           client.setInfo("loginId", loginId);
 
-          serverUI.display("Client logged in with ID: " + loginId);
+          setChanged();
+          notifyObservers("Client logged in with ID: " + loginId);
+
           try {
               client.sendToClient("Login working! Welcome " + loginId + "!");
-          } catch (IOException e) { /* what to do here? */ }
+          } catch (IOException e) { /* Ignore */ }
 
           return;
       }
@@ -91,52 +88,71 @@ public class EchoServer extends AbstractServer
               client.sendToClient("Error: Must login with first command which is #login <loginId>!!!");
               client.close();
           } catch (IOException e) {
-              serverUI.display("Error closing client connection: " + e.getMessage());
+              setChanged();
+              notifyObservers("Error closing client connection: " + e.getMessage());
           }
           return;
       }
 
       // 3. Prefix message with login id and broadcast
-      serverUI.display("Message received from " + loginId + ": " + message);
+      setChanged();
+      notifyObservers("Message received from " + loginId + ": " + message);
+
       this.sendToAllClients(loginId + "> " + message);
+
+      // Note: We don't call super.handleMessageFromClient() because we're doing custom processing
   }
 
   /**
    * This method is invoked when a new client connects.
+   * Notifies observers about the new connection.
    *
    * @param client The connection from which the message originated.
    */
   @Override
   protected void clientConnected(ConnectionToClient client) {
-      serverUI.display("Client connected: " + client);
+      super.clientConnected(client); // Sends OriginatorMessage notification
+      setChanged();
+      notifyObservers("Client connected: " + client);
   }
 
   /**
    * This method is invoked when a client disconnects.
+   * Notifies observers about the disconnection.
    *
    * @param client The connection from which the message originated.
    */
   @Override
   protected void clientDisconnected(ConnectionToClient client) {
-      serverUI.display("Client disconnected: " + client);
+      super.clientDisconnected(client); // Sends OriginatorMessage notification
+      setChanged();
+      notifyObservers("Client disconnected: " + client);
   }
     
   /**
    * This method overrides the one in the superclass.  Called
    * when the server starts listening for connections.
+   * Notifies observers about the server start.
    */
+  @Override
   protected void serverStarted()
   {
-    serverUI.display("Server listening for connections on port " + getPort());
+    super.serverStarted(); // Sends OriginatorMessage notification
+    setChanged();
+    notifyObservers("Server listening for connections on port " + getPort());
   }
-  
+
   /**
    * This method overrides the one in the superclass.  Called
    * when the server stops listening for connections.
+   * Notifies observers about the server stop.
    */
+  @Override
   protected void serverStopped()
   {
-    serverUI.display("Server has stopped listening for connections.");
+    super.serverStopped(); // Sends OriginatorMessage notification
+    setChanged();
+    notifyObservers("Server has stopped listening for connections.");
   }
   
   //Class methods ***************************************************

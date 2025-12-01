@@ -17,34 +17,28 @@ import java.io.*;
  * @author Fran&ccedil;ois B&eacute;langer
  * @version July 2000
  */
-public class ChatClient extends AbstractClient
+public class ChatClient extends ObservableClient
 {
   //Instance variables **********************************************
-  
-  /**
-   * The interface type variable.  It allows the implementation of 
-   * the display method in the client.
-   */
-  ChatIF clientUI; 
+
   private boolean manualDisconnect = false;
   private String loginId;
 
   
   //Constructors ****************************************************
-  
+
   /**
    * Constructs an instance of the chat client.
    *
+   * @param loginId The user's login ID.
    * @param host The server to connect to.
    * @param port The port number to connect on.
-   * @param clientUI The interface type variable.
    */
-  
-  public ChatClient(String loginId, String host, int port, ChatIF clientUI) 
-    throws IOException 
+
+  public ChatClient(String loginId, String host, int port)
+    throws IOException
   {
     super(host, port); //Call the superclass constructor
-    this.clientUI = clientUI;
     this.loginId = loginId;
     openConnection();
   }
@@ -54,60 +48,74 @@ public class ChatClient extends AbstractClient
     
   /**
    * Called automatically when the connection to the server is closed.
-   * Displays a shutdown message and exits the program.
+   * Notifies observers about the connection closure.
    */
   @Override
   protected void connectionClosed() {
+      super.connectionClosed(); // Notifies observers with CONNECTION_CLOSED
+
       boolean oldStatus = manualDisconnect;
       manualDisconnect = false;
 
-      if (!oldStatus) { // the pdf you provided (dr. wei) requires this because you say logoff should disconnect and not quit, but this handler is overwritten and you told us to quit on this handler.
-        clientUI.display("Connection closed. Exiting client.");
-        System.exit(0); // connection is already closed
+      if (!oldStatus) {
+        setChanged();
+        notifyObservers("Connection closed. Exiting client.");
       }
   }
 
   /**
    * Called automatically when a connection exception occurs.
-   * Displays the exception message and exits the program.
+   * Notifies observers about the connection exception.
    *
    * @param exception The exception thrown by the connection.
    */
   @Override
   protected void connectionException(Exception exception) {
+      super.connectionException(exception); // Notifies observers with CONNECTION_EXCEPTION
+
       boolean oldStatus = manualDisconnect;
       manualDisconnect = false;
 
       if (!oldStatus) {
-        clientUI.display("Connection error: " + exception.getMessage() + "; Exiting client.");
-        System.exit(0); // connection is already closed
+        setChanged();
+        notifyObservers("Connection error: " + exception.getMessage() + "; Exiting client.");
       }
   }
 
+  /**
+   * Called automatically when a connection is established.
+   * Sends the login command and notifies observers.
+   */
   @Override
   protected void connectionEstablished() {
+      super.connectionEstablished(); // Notifies observers with CONNECTION_ESTABLISHED
+
       try {
           sendToServer("#login " + loginId);
-          clientUI.display("Sent login command on the directly server: #login " + loginId);
+          setChanged();
+          notifyObservers("Sent login command to server: #login " + loginId);
       } catch (IOException e) {
-          clientUI.display("Error sending login command?: " + e.getMessage());
+          setChanged();
+          notifyObservers("Error sending login command: " + e.getMessage());
       }
   }
 
 
   /**
    * This method handles all data that comes in from the server.
+   * The super method already notifies observers with the message.
    *
    * @param msg The message from the server.
    */
-  public void handleMessageFromServer(Object msg) 
+  @Override
+  protected void handleMessageFromServer(Object msg)
   {
-    clientUI.display(msg.toString());
+    super.handleMessageFromServer(msg); // Notifies observers with msg
   }
 
   /**
    * Parses and executes client-side commands starting with '#'
-   * 
+   *
    * @param cmdLine the data passed in the UI.
    */
   private void handleCommand(String cmdLine) {
@@ -124,33 +132,45 @@ public class ChatClient extends AbstractClient
                       manualDisconnect = true;
                       closeConnection();
                   } catch (IOException e) {
-                      clientUI.display("Error closing connection: " + e.getMessage());
+                      setChanged();
+                      notifyObservers("Error closing connection: " + e.getMessage());
                   }
-                  clientUI.display("Logged off.");
-          } else clientUI.display("Already logged off.");
+                  setChanged();
+                  notifyObservers("Logged off.");
+          } else {
+              setChanged();
+              notifyObservers("Already logged off.");
+          }
         break;
         case "#sethost":
             if (isConnected()) {
-              clientUI.display("Error: must log off first.");
+              setChanged();
+              notifyObservers("Error: must log off first.");
             } else if (parts.length < 2 || parts[1].isBlank()) {
-              clientUI.display("Usage: #sethost <host>");
+              setChanged();
+              notifyObservers("Usage: #sethost <host>");
             } else {
               setHost(parts[1].trim());
-              clientUI.display("Host set to: " + getHost());
+              setChanged();
+              notifyObservers("Host set to: " + getHost());
             }
         break;
         case "#setport":
               if (isConnected()) {
-                clientUI.display("Error: must log off first.");
+                setChanged();
+                notifyObservers("Error: must log off first.");
               } else if (parts.length < 2) {
-                clientUI.display("Usage: #setport <port>");
+                setChanged();
+                notifyObservers("Usage: #setport <port>");
               } else {
                 try {
                   int p = Integer.parseInt(parts[1].trim());
                   setPort(p);
-                  clientUI.display("Port set to: " + getPort());
+                  setChanged();
+                  notifyObservers("Port set to: " + getPort());
                 } catch (NumberFormatException nfe) {
-                   clientUI.display("Port must be a number.");
+                   setChanged();
+                   notifyObservers("Port must be a number.");
                 }
               }
           break;
@@ -158,29 +178,35 @@ public class ChatClient extends AbstractClient
           if (!isConnected()) {
             try {
               openConnection();
-              clientUI.display("Logged in to " + getHost() + ":" + getPort());
+              setChanged();
+              notifyObservers("Logged in to " + getHost() + ":" + getPort());
             } catch (IOException e) {
-              clientUI.display("Error opening connection: " + e.getMessage());
+              setChanged();
+              notifyObservers("Error opening connection: " + e.getMessage());
             }
           } else {
-            clientUI.display("Already connected.");
+            setChanged();
+            notifyObservers("Already connected.");
           }
           break;
           case "#gethost":
-              clientUI.display("Host: " + getHost());
+              setChanged();
+              notifyObservers("Host: " + getHost());
               break;
           case "#getport":
-              clientUI.display("Port: " + getPort());
+              setChanged();
+              notifyObservers("Port: " + getPort());
               break;
           default:
-              clientUI.display("Unknown command.");
+              setChanged();
+              notifyObservers("Unknown command.");
       }
   }
 
   /**
-   * This method handles all data coming from the UI            
+   * This method handles all data coming from the UI
    *
-   * @param message The message, or command, from the UI.    
+   * @param message The message, or command, from the UI.
    */
   public void handleMessageFromClientUI(String message)
   {
@@ -196,8 +222,8 @@ public class ChatClient extends AbstractClient
     }
     catch(Exception e)
     {
-      clientUI.display
-        ("Could not send message to server.  Terminating client.");
+      setChanged();
+      notifyObservers("Could not send message to server. Terminating client.");
       quit();
     }
   }

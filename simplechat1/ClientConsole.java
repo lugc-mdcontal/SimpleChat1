@@ -5,18 +5,21 @@
 import java.io.*;
 import client.*;
 import common.*;
+import java.util.Observer;
+import java.util.Observable;
+import ocsf.client.ObservableClient;
 
 /**
  * This class constructs the UI for a chat client.  It implements the
  * chat interface in order to activate the display() method.
- * Warning: Some of the code here is cloned in ServerConsole 
+ * Warning: Some of the code here is cloned in ServerConsole
  *
  * @author Fran&ccedil;ois B&eacute;langer
- * @author Dr Timothy C. Lethbridge  
+ * @author Dr Timothy C. Lethbridge
  * @author Dr Robert Lagani&egrave;re
  * @version July 2000
  */
-public class ClientConsole implements ChatIF 
+public class ClientConsole implements ChatIF, Observer 
 {
   //Class variables *************************************************
   
@@ -42,13 +45,14 @@ public class ClientConsole implements ChatIF
    * @param host The host to connect to.
    * @param port The port to connect on.
    */
-  public ClientConsole(String loginId, String host, int port) 
+  public ClientConsole(String loginId, String host, int port)
   {
-    try 
+    try
     {
-      client= new ChatClient(loginId, host, port, this);
-    } 
-    catch(IOException exception) 
+      client = new ChatClient(loginId, host, port);
+      client.addObserver(this); // Register as observer
+    }
+    catch(IOException exception)
     {
       System.out.println("Error: Can't setup connection!"
                 + " Terminating client.");
@@ -58,9 +62,44 @@ public class ClientConsole implements ChatIF
 
   
   //Instance methods ************************************************
-  
+
   /**
-   * This method waits for input from the console.  Once it is 
+   * This method is called when the observed object (ChatClient) changes.
+   * It handles all notifications from the client.
+   *
+   * @param obs The observable object (the ChatClient)
+   * @param arg The notification argument (message or event string)
+   */
+  @Override
+  public void update(Observable obs, Object arg) {
+      // Handle different types of notifications
+      if (arg instanceof String) {
+          String message = (String) arg;
+
+          // Check for special event notifications
+          if (message.equals(ObservableClient.CONNECTION_CLOSED)) {
+              display("Connection closed. Exiting client.");
+              System.exit(0);
+          }
+          else if (message.equals(ObservableClient.CONNECTION_EXCEPTION)) {
+              display("Connection error. Exiting client.");
+              System.exit(0);
+          }
+          else if (message.equals(ObservableClient.CONNECTION_ESTABLISHED)) {
+              display("Connection established.");
+          }
+          else {
+              // Regular message
+              display(message);
+          }
+      } else {
+          // Handle any other object type
+          display(arg.toString());
+      }
+  }
+
+  /**
+   * This method waits for input from the console.  Once it is
    * received, it sends it to the client's message handler.
    */
   public void accept() 

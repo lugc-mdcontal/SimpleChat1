@@ -1,11 +1,13 @@
 import java.io.*;
 import ocsf.server.*;
 import common.*;
+import java.util.Observer;
+import java.util.Observable;
 
 /**
  * ServerConsole allows server admin to type messages/commands.
  */
-public class ServerConsole implements ChatIF {
+public class ServerConsole implements ChatIF, Observer {
     //Class variables *************************************************
   
     /**
@@ -28,21 +30,67 @@ public class ServerConsole implements ChatIF {
      * @param port The port to start on.
      */
     public ServerConsole(int port) {
-        server = new EchoServer(port, this);
+        server = new EchoServer(port);
+        server.addObserver(this); // Register as observer
     }
 
     //Instance methods ************************************************
-  
-    /**
-    * This method waits for input from the console.  Once it is 
-    * received, it sends it to the client's message handler.
-    */
 
-   /**
+    /**
+     * This method is called when the observed object (EchoServer) changes.
+     * It handles all notifications from the server.
+     *
+     * @param obs The observable object (the EchoServer)
+     * @param arg The notification argument (OriginatorMessage or String)
+     */
+    @Override
+    public void update(Observable obs, Object arg) {
+        // Handle OriginatorMessage on the here
+        if (arg instanceof OriginatorMessage) {
+            OriginatorMessage om = (OriginatorMessage) arg;
+            Object message = om.getMessage();
+
+            // Check for server event constants
+            if (message.equals(ObservableOriginatorServer.SERVER_STARTED)) {
+                // Alrady handled
+            }
+            else if (message.equals(ObservableOriginatorServer.SERVER_STOPPED)) {
+                // Already handled
+            }
+            else if (message.equals(ObservableOriginatorServer.SERVER_CLOSED)) {
+                display("Server closed.");
+            }
+            else if (message.equals(ObservableOriginatorServer.CLIENT_CONNECTED)) {
+                // Already handled 
+            }
+            else if (message.equals(ObservableOriginatorServer.CLIENT_DISCONNECTED)) {
+                // Already handled
+            }
+            else if (message.equals(ObservableOriginatorServer.CLIENT_EXCEPTION)) {
+                display("Client exception occurred.");
+            }
+            else if (message.equals(ObservableOriginatorServer.LISTENING_EXCEPTION)) {
+                display("Listening exception occurred.");
+            }
+            else {
+                // EchoServer already broadcasts it
+            }
+        }
+        else if (arg instanceof String) {
+            // Custom string notifications from EchoServer
+            display((String) arg);
+        }
+        else {
+            // Fallback for any other object type
+            display(arg.toString());
+        }
+    }
+
+    /**
      * Displays a message to the ServerConsole UI.
      *
      * @param message The message to print.
-    */
+     */
     public void display(String message) {
         System.out.println("> " + message);
     }
@@ -104,6 +152,9 @@ public class ServerConsole implements ChatIF {
             String msg;
             while (true) {
                 msg = br.readLine();
+                if (msg == null) {
+                    break; // End of input stream
+                }
                 if (msg.startsWith("#"))
                     handleCommand(msg);
                 else {
